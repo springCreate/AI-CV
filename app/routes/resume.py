@@ -505,7 +505,7 @@ def export_pdf(resume_id: int):
 @resume_bp.route("/<int:resume_id>/download-pdf", methods=["GET"])
 @login_required
 def download_pdf(resume_id: int):
-    """下载 PDF 文件"""
+    """下载/预览 PDF 文件"""
     try:
         r = _get_user_resume(resume_id, g.current_user_id)
     except ValueError as e:
@@ -515,5 +515,10 @@ def download_pdf(resume_id: int):
     if not pdf_path or not os.path.exists(pdf_path):
         return error_response("PDF 文件不存在，请先生成", 404)
 
-    return send_file(pdf_path, as_attachment=True,
-                     download_name=f"{r.name or 'resume'}.pdf")
+    inline = request.args.get("inline", "false").lower() == "true"
+    return send_file(
+        pdf_path,
+        as_attachment=not inline,
+        download_name=f"{r.name or 'resume'}.pdf",
+        mimetype="application/pdf",
+    )

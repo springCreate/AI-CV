@@ -54,6 +54,36 @@ const API = (function() {
     }
   }
 
+  async function downloadFile(url, filename, openInline = false) {
+    const resp = await fetch(BASE + url, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${getToken()}` },
+    });
+    if (resp.status === 401) {
+      setToken(null); setUser(null);
+      window.location.href = '/';
+      throw new Error('未登录或登录已过期');
+    }
+    if (!resp.ok) {
+      const result = await resp.json().catch(() => ({}));
+      throw new Error(result.message || '文件获取失败');
+    }
+    const blob = await resp.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    if (openInline) {
+      window.open(blobUrl, '_blank');
+    } else {
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    return blobUrl;
+  }
+
   return {
     // 认证
     auth: {
@@ -130,6 +160,6 @@ const API = (function() {
     },
     // 工具
     getToken, setToken, getUser, setUser,
-    downloadUrl: (path) => BASE + path.replace(BASE, ''),
+    downloadFile,
   };
 })();

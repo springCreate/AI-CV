@@ -184,10 +184,22 @@ const ResumePage = {
 
     async function exportPdf(r) {
       try {
-        const data = await API.resume.exportPdf(r.id, { pages: 'single' });
+        await API.resume.exportPdf(r.id, { pages: 'single' });
         ElMessage.success('PDF 生成成功');
-        window.open(`/api/resume/${r.id}/download-pdf`, '_blank');
+        await API.downloadFile(`/resume/${r.id}/download-pdf`, `${r.name || 'resume'}.pdf`, false);
         await load();
+      } catch (e) {
+        ElMessage.error(e.message);
+      }
+    }
+
+    async function previewPdf(r) {
+      try {
+        if (!r.optimized_file_path) {
+          await API.resume.exportPdf(r.id, { pages: 'single' });
+          await load();
+        }
+        await API.downloadFile(`/resume/${r.id}/download-pdf?inline=true`, `${r.name || 'resume'}.pdf`, true);
       } catch (e) {
         ElMessage.error(e.message);
       }
@@ -255,7 +267,7 @@ const ResumePage = {
       subDialog, subType, subForm,
       load, handleFileChange, handleUpload, openCreate, saveCreate, viewDetail, loadDetail,
       editBasic, saveBasic, remove, openOptimize, doOptimize, applyOptimization,
-      exportPdf, reparse, openAddSub, saveSub, removeSub,
+      exportPdf, previewPdf, reparse, openAddSub, saveSub, removeSub,
     };
   },
   template: `
@@ -289,6 +301,7 @@ const ResumePage = {
             </div>
             <div style="margin-top:12px;display:flex;gap:6px;flex-wrap:wrap;">
               <el-button size="small" @click.stop="openOptimize(r)"><el-icon><MagicStick /></el-icon> AI 优化</el-button>
+              <el-button size="small" @click.stop="previewPdf(r)"><el-icon><View /></el-icon> 预览</el-button>
               <el-button size="small" @click.stop="exportPdf(r)"><el-icon><Download /></el-icon> 导出PDF</el-button>
               <el-button size="small" @click.stop="editBasic(r)"><el-icon><Edit /></el-icon> 编辑</el-button>
               <el-button v-if="r.source_file_path" size="small" @click.stop="reparse(r)"><el-icon><Refresh /></el-icon> 重解析</el-button>
