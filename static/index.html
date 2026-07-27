@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 智能简历适配与多平台岗位匹配投递系统</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.7.6/dist/index.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 登录页 -->
+    <div v-if="!isLoggedIn" class="login-bg">
+      <div class="login-card">
+        <div class="login-title">AI 智能简历投递系统</div>
+        <div class="login-subtitle">基于 DeepSeek 的求职全流程辅助工具</div>
+        <el-tabs v-model="authTab" stretch>
+          <el-tab-pane label="登录" name="login">
+            <el-form ref="loginForm" :model="loginData" :rules="loginRules" label-position="top">
+              <el-form-item label="用户名" prop="username">
+                <el-input v-model="loginData.username" placeholder="请输入用户名" prefix-icon="User" @keyup.enter="handleLogin"></el-input>
+              </el-form-item>
+              <el-form-item label="密码" prop="password">
+                <el-input v-model="loginData.password" type="password" placeholder="请输入密码" prefix-icon="Lock" show-password @keyup.enter="handleLogin"></el-input>
+              </el-form-item>
+              <el-button type="primary" :loading="authLoading" @click="handleLogin" style="width:100%;margin-top:8px;">登录</el-button>
+            </el-form>
+          </el-tab-pane>
+          <el-tab-pane label="注册" name="register">
+            <el-form ref="registerForm" :model="registerData" :rules="registerRules" label-position="top">
+              <el-form-item label="用户名" prop="username">
+                <el-input v-model="registerData.username" placeholder="3-32 位字符" prefix-icon="User"></el-input>
+              </el-form-item>
+              <el-form-item label="昵称（可选）" prop="nickname">
+                <el-input v-model="registerData.nickname" placeholder="显示名称" prefix-icon="UserFilled"></el-input>
+              </el-form-item>
+              <el-form-item label="密码" prop="password">
+                <el-input v-model="registerData.password" type="password" placeholder="6-64 位" prefix-icon="Lock" show-password></el-input>
+              </el-form-item>
+              <el-form-item label="确认密码" prop="confirmPassword">
+                <el-input v-model="registerData.confirmPassword" type="password" placeholder="再次输入密码" prefix-icon="Lock" show-password></el-input>
+              </el-form-item>
+              <el-button type="primary" :loading="authLoading" @click="handleRegister" style="width:100%;margin-top:8px;">注册</el-button>
+            </el-form>
+          </el-tab-pane>
+        </el-tabs>
+        <div style="text-align:center;margin-top:20px;font-size:12px;color:#a0aec0;">
+          数据仅本地存储 · 多用户隔离 · 零云端上传
+        </div>
+      </div>
+    </div>
+
+    <!-- 主应用 -->
+    <el-container v-else style="height:100vh;">
+      <el-aside width="220px" class="layout-aside">
+        <div class="logo">AI 简历投递系统</div>
+        <el-menu :default-active="currentMenu" @select="handleMenuSelect" background-color="#1a202c" text-color="#cbd5e0" active-text-color="#fff">
+          <el-menu-item index="dashboard"><el-icon><DataLine /></el-icon><span>仪表盘</span></el-menu-item>
+          <el-menu-item index="resume"><el-icon><Document /></el-icon><span>我的简历</span></el-menu-item>
+          <el-menu-item index="template"><el-icon><Files /></el-icon><span>求职诉求</span></el-menu-item>
+          <el-menu-item index="job"><el-icon><Position /></el-icon><span>岗位匹配</span></el-menu-item>
+          <el-menu-item index="application"><el-icon><Promotion /></el-icon><span>投递管理</span></el-menu-item>
+          <el-menu-item index="blacklist"><el-icon><CircleClose /></el-icon><span>公司黑名单</span></el-menu-item>
+          <el-menu-item index="settings"><el-icon><Setting /></el-icon><span>系统设置</span></el-menu-item>
+        </el-menu>
+      </el-aside>
+
+      <el-container>
+        <el-header class="layout-header">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <el-tag v-if="mockMode" type="warning" size="small">演示模式</el-tag>
+            <el-tag v-if="aiConfigured" type="success" size="small">DeepSeek 已连接</el-tag>
+            <el-tag v-else type="danger" size="small">DeepSeek 未配置</el-tag>
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;">
+            <el-badge :value="newRemindersCount" :hidden="newRemindersCount===0" :max="99">
+              <el-button text :icon="Bell" @click="loadNewReminders">提醒</el-button>
+            </el-badge>
+            <el-dropdown @command="handleUserCommand">
+              <span style="cursor:pointer;display:flex;align-items:center;gap:6px;">
+                <el-avatar :size="28" style="background:#2c5282;">{{ (currentUser.nickname || currentUser.username || 'U').charAt(0).toUpperCase() }}</el-avatar>
+                <span style="font-size:14px;">{{ currentUser.nickname || currentUser.username }}</span>
+                <el-icon><ArrowDown /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="settings">系统设置</el-dropdown-item>
+                  <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </el-header>
+
+        <el-main class="layout-main">
+          <component :is="currentPageComponent"></component>
+        </el-main>
+      </el-container>
+    </el-container>
+
+    <!-- 全局对话框、通知等占位 -->
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.31/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/element-plus@2.7.6/dist/index.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.1/dist/index.iife.min.js"></script>
+  <script src="/js/api.js?v=3"></script>
+  <script src="/js/components/dashboard.js?v=3"></script>
+  <script src="/js/components/resume.js?v=3"></script>
+  <script src="/js/components/template.js?v=3"></script>
+  <script src="/js/components/job.js?v=3"></script>
+  <script src="/js/components/application.js?v=3"></script>
+  <script src="/js/components/blacklist.js?v=3"></script>
+  <script src="/js/components/settings.js?v=3"></script>
+  <script src="/js/app.js?v=3"></script>
+</body>
+</html>

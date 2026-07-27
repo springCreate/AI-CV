@@ -1,0 +1,77 @@
+# ============================================
+# AI 智能简历适配与多平台岗位匹配投递系统 - 配置文件
+# 复制本文件为 config.yaml 并填入真实配置后使用
+# ============================================
+
+# 服务配置
+server:
+  host: 127.0.0.1
+  port: 5000
+  debug: false
+  secret_key: "请修改为随机字符串_例如_abc123xyz789"  # JWT 加密密钥，务必修改
+
+# 数据库配置（本地 SQLite）
+database:
+  uri: "sqlite:///data/app.db"
+  track_modifications: false
+
+# 文件存储路径
+storage:
+  resume_dir: "data/resumes"        # 原始简历文件
+  optimized_dir: "data/optimized"   # AI 优化后简历
+  export_dir: "data/exports"        # Excel 导出文件
+  max_upload_mb: 20
+
+# DeepSeek AI 配置
+deepseek:
+  # 官方 API 地址（OpenAI 兼容协议）
+  base_url: "https://api.deepseek.com/v1"
+  # 在此填入你的 DeepSeek API Key
+  api_key: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  # 模型选择：deepseek-chat（通用）/ deepseek-reasoner（推理）
+  model: "deepseek-chat"
+  # 模型最大上下文 Token（DeepSeek 上限为 1048576，预留安全边距）
+  max_context_tokens: 1048000
+  # 单次响应最大 Token
+  max_output_tokens: 4096
+  # 温度参数：0.0-2.0，简历优化建议用 0.3-0.7 较稳定
+  temperature: 0.5
+  # 请求超时（秒）
+  timeout: 120
+  # 失败重试次数
+  max_retries: 3
+
+# 招聘平台 API 配置
+# 说明：各平台开放接口需自行申请，无开放 API 的平台走 Mock 模式
+job_platforms:
+  boss:
+    enabled: false
+    base_url: ""
+    app_key: ""
+    app_secret: ""
+  zhilian:
+    enabled: false
+    base_url: ""
+    api_key: ""
+  51job:
+    enabled: false
+    base_url: ""
+    api_key: ""
+  shixiseng:
+    enabled: false
+    base_url: ""
+    api_key: ""
+  # 当所有平台未启用时，系统使用本地 Mock 数据演示完整流程
+  mock_mode: true
+
+# 岗位刷新配置
+job_refresh:
+  # 自动刷新间隔（分钟），0 表示关闭
+  interval_minutes: 60
+  # 高匹配度阈值（≥此分数触发提醒）
+  high_match_threshold: 80
+
+# 日志配置
+logging:
+  level: "INFO"
+  file: "data/logs/app.log"

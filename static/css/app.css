@@ -1,0 +1,130 @@
+/* 全局样式 */
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  background: #f5f7fa;
+  color: #2d3748;
+}
+#app { height: 100%; }
+
+/* 登录页 */
+.login-bg {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+  width: 400px; padding: 40px 32px;
+  background: #fff; border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+}
+.login-title {
+  text-align: center; font-size: 22px; font-weight: 600;
+  color: #2c5282; margin-bottom: 8px;
+}
+.login-subtitle {
+  text-align: center; font-size: 13px; color: #718096; margin-bottom: 28px;
+}
+
+/* 主布局 */
+.layout-aside {
+  background: #1a202c !important;
+  color: #cbd5e0;
+}
+.layout-aside .el-menu {
+  background: transparent !important;
+  border-right: none !important;
+}
+.layout-aside .el-menu-item.is-active {
+  background: #2c5282 !important;
+  color: #fff !important;
+}
+.layout-aside .el-menu-item:hover {
+  background: #2d3748 !important;
+}
+.layout-aside .logo {
+  height: 60px; line-height: 60px;
+  text-align: center; color: #fff;
+  font-size: 16px; font-weight: 600;
+  border-bottom: 1px solid #2d3748;
+  padding: 0 12px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.layout-header {
+  background: #fff; border-bottom: 1px solid #e2e8f0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; height: 56px;
+}
+.layout-main { padding: 20px; background: #f5f7fa; min-height: calc(100vh - 56px); }
+
+/* 通用卡片 */
+.section-card { margin-bottom: 16px; }
+.page-title {
+  font-size: 18px; font-weight: 600; color: #1a202c;
+  margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;
+}
+
+/* 简历卡片 */
+.resume-card {
+  cursor: pointer; transition: all 0.2s;
+}
+.resume-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+
+/* 匹配分数 */
+.score-badge {
+  display: inline-block; padding: 2px 10px;
+  border-radius: 12px; font-size: 12px; font-weight: 600;
+}
+.score-high { background: #c6f6d5; color: #22543d; }
+.score-mid { background: #fefcbf; color: #744210; }
+.score-low { background: #fed7d7; color: #742a2a; }
+
+/* JD 文本 */
+.jd-text {
+  white-space: pre-wrap; word-break: break-word;
+  max-height: 200px; overflow-y: auto;
+  background: #f7fafc; padding: 12px; border-radius: 6px;
+  font-size: 13px; line-height: 1.6;
+}
+
+/* 标签云 */
+.tag-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* 空状态 */
+.empty-state {
+  text-align: center; padding: 60px 20px; color: #a0aec0;
+}
+.empty-state .el-icon { font-size: 48px; margin-bottom: 12px; }
+
+/* 优化建议项 */
+.suggestion-item {
+  background: #f7fafc; padding: 12px; border-radius: 6px;
+  margin-bottom: 8px; border-left: 3px solid #4299e1;
+}
+.suggestion-item .target { font-size: 12px; color: #718096; margin-bottom: 4px; }
+.suggestion-item .original { color: #718096; text-decoration: line-through; font-size: 13px; }
+.suggestion-item .suggested { color: #2d3748; font-size: 13px; margin-top: 4px; }
+.suggestion-item .reason { font-size: 12px; color: #4a5568; margin-top: 6px; font-style: italic; }
+
+/* 话术展示 */
+.script-block {
+  background: #f7fafc; padding: 12px; border-radius: 6px;
+  border-left: 3px solid #48bb78;
+  white-space: pre-wrap; word-break: break-word;
+  font-size: 13px; line-height: 1.7;
+  max-height: 300px; overflow-y: auto;
+}
+
+/* 统计卡片 */
+.stat-card {
+  background: #fff; padding: 20px; border-radius: 8px;
+  text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+.stat-card .stat-value { font-size: 28px; font-weight: 700; color: #2c5282; }
+.stat-card .stat-label { font-size: 13px; color: #718096; margin-top: 4px; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 4px; }
+::-webkit-scrollbar-track { background: #f7fafc; }
