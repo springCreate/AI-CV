@@ -104,29 +104,23 @@ const API = (function() {
     job: {
       list: (params) => request('GET', '/job' + (params ? '?' + new URLSearchParams(params) : '')),
       get: (id) => request('GET', `/job/${id}`),
+      create: (data) => request('POST', '/job', data),
       delete: (id) => request('DELETE', `/job/${id}`),
-      fetchMatch: (data) => request('POST', '/job/fetch-match', data),
+      match: (data) => request('POST', '/job/match', data),
       matchRecords: (params) => request('GET', '/job/match-records' + (params ? '?' + new URLSearchParams(params) : '')),
       newReminders: () => request('GET', '/job/new-reminders'),
       markRead: (id) => request('POST', `/job/${id}/mark-read`),
-      platformsStatus: () => request('GET', '/job/platforms/status'),
       // 黑名单
       blacklist: () => request('GET', '/job/blacklist'),
       addBlacklist: (data) => request('POST', '/job/blacklist', data),
       removeBlacklist: (id) => request('DELETE', `/job/blacklist/${id}`),
     },
-    // 投递
-    application: {
-      list: (params) => request('GET', '/application' + (params ? '?' + new URLSearchParams(params) : '')),
-      get: (id) => request('GET', `/application/${id}`),
-      create: (data) => request('POST', '/application', data),
-      update: (id, data) => request('PUT', `/application/${id}`, data),
-      delete: (id) => request('DELETE', `/application/${id}`),
-      markApplied: (id) => request('POST', `/application/${id}/mark-applied`),
-      generateScript: (jobId, data) => request('POST', `/application/${jobId}/generate-script`, data),
-      batchGenerate: (data) => request('POST', '/application/batch-generate-scripts', data),
-      exportExcel: (data) => request('POST', '/application/export-excel', data),
-      stats: () => request('GET', '/application/stats'),
+    // 面试题库
+    interview: {
+      list: (params) => request('GET', '/interview' + (params ? '?' + new URLSearchParams(params) : '')),
+      get: (id) => request('GET', `/interview/${id}`),
+      delete: (id) => request('DELETE', `/interview/${id}`),
+      generate: (data) => request('POST', '/interview/generate', data),
     },
     // 系统
     system: {

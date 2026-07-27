@@ -3,28 +3,40 @@
  */
 const JobPage = {
   setup() {
-    const activeTab = ref('match');
+    const activeTab = ref('jobs');
     const loading = ref(false);
-    const fetchLoading = ref(false);
 
-    // 拉取匹配表单
-    const fetchForm = ref({ resume_id: null, template_id: null, keyword: '', city: '' });
+    // 匹配表单
+    const matchForm = ref({ resume_id: null, job_id: null, template_id: null });
     const resumes = ref([]);
     const templates = ref([]);
-    const lastResult = ref(null);
+    const jobs = ref([]);
+    const matchResult = ref(null);
+    const matchLoading = ref(false);
 
     // 匹配记录
     const records = ref([]);
     const recordsTotal = ref(0);
     const recordsPage = ref(1);
     const recordsPerPage = ref(20);
-    const recordsFilter = ref({ only_passed: true, min_score: null, template_id: null });
+    const recordsFilter = ref({ only_passed: true, min_score: null });
 
     // 岗位列表
-    const jobs = ref([]);
     const jobsTotal = ref(0);
     const jobsPage = ref(1);
-    const jobsFilter = ref({ platform: '', city: '', keyword: '' });
+    const jobsFilter = ref({ city: '', keyword: '' });
+
+    // 手动录入岗位
+    const createDialog = ref(false);
+    const createForm = ref({
+      title: '', company: '', city: '', district: '',
+      salary_min: null, salary_max: null, salary_text: '',
+      work_years: '', education: '', job_type: '全职',
+      is_weekend_off: null, has_accommodation: null,
+      jd_text: '', company_size: '', company_industry: '',
+      hr_name: '', job_url: ''
+    });
+    const createLoading = ref(false);
 
     // 详情
     const detailDialog = ref(false);
@@ -32,44 +44,45 @@ const JobPage = {
 
     async function loadOptions() {
       try {
-        const [r, t] = await Promise.all([API.resume.list(), API.template.list()]);
+        const [r, t, j] = await Promise.all([API.resume.list(), API.template.list(), API.job.list({ per_page: 100 })]);
         resumes.value = r;
         templates.value = t;
-        // 默认选中第一个简历和默认模板
-        if (r.length && !fetchForm.value.resume_id) fetchForm.value.resume_id = r[0].id;
+        jobs.value = j.items || [];
+        if (r.length && !matchForm.value.resume_id) matchForm.value.resume_id = r[0].id;
         const def = t.find(x => x.is_default);
-        if (def && !fetchForm.value.template_id) fetchForm.value.template_id = def.id;
+        if (def && !matchForm.value.template_id) matchForm.value.template_id = def.id;
       } catch (e) {
         ElMessage.error(e.message);
       }
     }
 
-    async function fetchAndMatch() {
-      if (!fetchForm.value.resume_id && resumes.value.length) fetchForm.value.resume_id = resumes.value[0].id;
-      if (!fetchForm.value.template_id && templates.value.length) fetchForm.value.template_id = templates.value[0].id;
-      if (!fetchForm.value.resume_id || !fetchForm.value.template_id) {
-        ElMessage.warning('请选择简历和求职诉求模板');
+    async function startMatch() {
+      if (!matchForm.value.resume_id) {
+        ElMessage.warning('请选择简历');
         return;
       }
-      fetchLoading.value = true;
+      if (!matchForm.value.job_id) {
+        ElMessage.warning('请选择岗位');
+        return;
+      }
+      if (!matchForm.value.template_id) {
+        ElMessage.warning('请选择求职诉求模板');
+        return;
+      }
+      matchLoading.value = true;
       try {
-        const data = await API.job.fetchMatch({
-          resume_id: fetchForm.value.resume_id,
-          template_id: fetchForm.value.template_id,
-          keyword: fetchForm.value.keyword,
-          city: fetchForm.value.city,
+        const data = await API.job.match({
+          resume_id: matchForm.value.resume_id,
+          job_id: matchForm.value.job_id,
+          template_id: matchForm.value.template_id,
         });
-        lastResult.value = data;
-        ElMessage.success(`拉取 ${data.total_fetched} 个岗位，新增 ${data.new_saved}，高匹配 ${data.high_match_count}`);
-        if (data.is_mock_mode) {
-          ElMessage.warning('当前为演示模式，使用 Mock 数据');
-        }
+        matchResult.value = data;
+        ElMessage.success(`匹配完成，得分 ${data.match_score}`);
         await loadRecords();
-        activeTab.value = 'match';
       } catch (e) {
         ElMessage.error(e.message);
       } finally {
-        fetchLoading.value = false;
+        matchLoading.value = false;
       }
     }
 
@@ -82,7 +95,6 @@ const JobPage = {
           only_passed: recordsFilter.value.only_passed ? 'true' : 'false',
         };
         if (recordsFilter.value.min_score) params.min_score = recordsFilter.value.min_score;
-        if (recordsFilter.value.template_id) params.template_id = recordsFilter.value.template_id;
         const data = await API.job.matchRecords(params);
         records.value = data.items;
         recordsTotal.value = data.total;
@@ -97,7 +109,6 @@ const JobPage = {
       loading.value = true;
       try {
         const params = { page: jobsPage.value, per_page: recordsPerPage.value };
-        if (jobsFilter.value.platform) params.platform = jobsFilter.value.platform;
         if (jobsFilter.value.city) params.city = jobsFilter.value.city;
         if (jobsFilter.value.keyword) params.keyword = jobsFilter.value.keyword;
         const data = await API.job.list(params);
@@ -107,6 +118,37 @@ const JobPage = {
         ElMessage.error(e.message);
       } finally {
         loading.value = false;
+      }
+    }
+
+    function openCreateDialog() {
+      createForm.value = {
+        title: '', company: '', city: '', district: '',
+        salary_min: null, salary_max: null, salary_text: '',
+        work_years: '', education: '', job_type: '全职',
+        is_weekend_off: null, has_accommodation: null,
+        jd_text: '', company_size: '', company_industry: '',
+        hr_name: '', job_url: ''
+      };
+      createDialog.value = true;
+    }
+
+    async function submitCreateJob() {
+      if (!createForm.value.title || !createForm.value.company || !createForm.value.job_url) {
+        ElMessage.warning('岗位名称、公司和原链接为必填项');
+        return;
+      }
+      createLoading.value = true;
+      try {
+        await API.job.create(createForm.value);
+        ElMessage.success('岗位录入成功');
+        createDialog.value = false;
+        await loadJobs();
+        await loadOptions();
+      } catch (e) {
+        ElMessage.error(e.message);
+      } finally {
+        createLoading.value = false;
       }
     }
 
@@ -143,52 +185,73 @@ const JobPage = {
 
     onMounted(async () => {
       await loadOptions();
-      await loadRecords();
+      await loadJobs();
     });
 
     return {
-      activeTab, loading, fetchLoading,
-      fetchForm, resumes, templates, lastResult,
+      activeTab, loading,
+      matchForm, resumes, templates, jobs, matchResult, matchLoading,
       records, recordsTotal, recordsPage, recordsPerPage, recordsFilter,
-      jobs, jobsTotal, jobsPage, jobsFilter,
+      jobsTotal, jobsPage, jobsFilter,
       detailDialog, currentJob,
-      loadOptions, fetchAndMatch, loadRecords, loadJobs,
+      createDialog, createForm, createLoading,
+      loadOptions, startMatch, loadRecords, loadJobs,
       viewJob, deleteJob, scoreClass, openJobUrl, handleTabChange,
+      openCreateDialog, submitCreateJob,
     };
   },
   template: `
     <div>
-      <div class="page-title">岗位匹配
-        <el-button type="primary" @click="fetchAndMatch" :loading="fetchLoading">
-          <el-icon><Refresh /></el-icon> 一键拉取并匹配
-        </el-button>
-      </div>
+      <div class="page-title">岗位匹配</div>
 
       <el-card class="section-card">
-        <el-form :model="fetchForm" label-width="120px" :inline="true">
-          <el-form-item label="选择简历">
-            <el-select v-model="fetchForm.resume_id" placeholder="请选择" style="width:200px;">
+        <template #header><strong>智能匹配</strong></template>
+        <el-form :model="matchForm" label-width="100px" :inline="true">
+          <el-form-item label="选择简历" required>
+            <el-select v-model="matchForm.resume_id" placeholder="请选择" style="width:200px;">
               <el-option v-for="r in resumes" :key="r.id" :label="r.name" :value="r.id"></el-option>
             </el-select>
           </el-form-item>
-          <el-form-item label="求职诉求">
-            <el-select v-model="fetchForm.template_id" placeholder="请选择" style="width:200px;">
+          <el-form-item label="选择岗位" required>
+            <el-select v-model="matchForm.job_id" placeholder="请选择" style="width:280px;" filterable>
+              <el-option v-for="j in jobs" :key="j.id" :label="j.company + ' - ' + j.title" :value="j.id"></el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="求职诉求" required>
+            <el-select v-model="matchForm.template_id" placeholder="请选择" style="width:180px;">
               <el-option v-for="t in templates" :key="t.id" :label="t.name" :value="t.id"></el-option>
             </el-select>
           </el-form-item>
-          <el-form-item label="关键词">
-            <el-input v-model="fetchForm.keyword" placeholder="默认用模板岗位" style="width:160px;"></el-input>
-          </el-form-item>
-          <el-form-item label="城市">
-            <el-input v-model="fetchForm.city" placeholder="默认用模板城市" style="width:120px;"></el-input>
-          </el-form-item>
           <el-form-item>
-            <el-button type="primary" @click="fetchAndMatch" :loading="fetchLoading">开始拉取</el-button>
+            <el-button type="primary" @click="startMatch" :loading="matchLoading">开始匹配</el-button>
           </el-form-item>
         </el-form>
-        <el-alert v-if="lastResult" type="success" :closable="false" style="margin-top:8px;">
-          本次拉取 {{ lastResult.total_fetched }} 个岗位，新增 {{ lastResult.new_saved }}，匹配 {{ lastResult.total_matched }}，高匹配度（≥80分）{{ lastResult.high_match_count }} 个
-        </el-alert>
+
+        <div v-if="matchResult" style="margin-top:16px;">
+          <el-divider content-position="left">匹配结果</el-divider>
+          <div style="display:flex;gap:24px;">
+            <div style="text-align:center;">
+              <div :class="['score-display', scoreClass(matchResult.match_score)]">{{ matchResult.match_score }}</div>
+              <div style="font-size:12px;color:#718096;margin-top:4px;">匹配度</div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-weight:bold;margin-bottom:8px;">{{ matchResult.job?.company }} - {{ matchResult.job?.title }}</div>
+              <div style="font-size:14px;color:#2d3748;">{{ matchResult.match_summary }}</div>
+              <div v-if="matchResult.skill_suggestions && matchResult.skill_suggestions.length" style="margin-top:12px;">
+                <el-tag type="warning" size="small" style="margin-right:8px;">技能提升建议</el-tag>
+                <ul style="margin-top:8px;padding-left:20px;">
+                  <li v-for="(s, idx) in matchResult.skill_suggestions" :key="idx" style="font-size:13px;color:#e53e3e;margin-bottom:4px;">{{ s }}</li>
+                </ul>
+              </div>
+              <div v-if="matchResult.missing_skills && matchResult.missing_skills.length" style="margin-top:12px;">
+                <el-tag type="danger" size="small" style="margin-right:8px;">缺失技能</el-tag>
+                <span v-for="(s, idx) in matchResult.missing_skills" :key="idx" style="margin-right:8px;">
+                  <el-tag size="small">{{ s }}</el-tag>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
       </el-card>
 
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
@@ -196,9 +259,6 @@ const JobPage = {
           <div style="margin-bottom:12px;display:flex;gap:12px;align-items:center;">
             <el-checkbox v-model="recordsFilter.only_passed" @change="loadRecords">仅显示通过硬性过滤</el-checkbox>
             <el-input-number v-model="recordsFilter.min_score" :min="0" :max="100" placeholder="最低分数" @change="loadRecords" style="width:120px;"></el-input-number>
-            <el-select v-model="recordsFilter.template_id" placeholder="按模板筛选" clearable @change="loadRecords" style="width:200px;">
-              <el-option v-for="t in templates" :key="t.id" :label="t.name" :value="t.id"></el-option>
-            </el-select>
             <el-button @click="loadRecords"><el-icon><Refresh /></el-icon> 刷新</el-button>
           </div>
 
@@ -212,11 +272,6 @@ const JobPage = {
             <el-table-column label="岗位" prop="job.title" min-width="140"></el-table-column>
             <el-table-column label="城市" prop="job.city" width="80"></el-table-column>
             <el-table-column label="薪资" prop="job.salary_text" width="100"></el-table-column>
-            <el-table-column label="平台" prop="job.platform" width="80">
-              <template #default="{ row }">
-                <el-tag size="small">{{ row.job.platform }}</el-tag>
-              </template>
-            </el-table-column>
             <el-table-column label="硬性过滤" width="100">
               <template #default="{ row }">
                 <el-tag v-if="row.hard_filter_passed" type="success" size="small">通过</el-tag>
@@ -249,16 +304,10 @@ const JobPage = {
 
         <el-tab-pane label="全部岗位" name="jobs">
           <div style="margin-bottom:12px;display:flex;gap:12px;">
-            <el-select v-model="jobsFilter.platform" placeholder="平台" clearable @change="loadJobs" style="width:120px;">
-              <el-option label="BOSS直聘" value="boss"></el-option>
-              <el-option label="智联招聘" value="zhilian"></el-option>
-              <el-option label="前程无忧" value="51job"></el-option>
-              <el-option label="实习僧" value="shixiseng"></el-option>
-              <el-option label="演示数据" value="mock"></el-option>
-            </el-select>
             <el-input v-model="jobsFilter.city" placeholder="城市" clearable @change="loadJobs" style="width:120px;"></el-input>
             <el-input v-model="jobsFilter.keyword" placeholder="公司/岗位关键词" clearable @change="loadJobs" style="width:200px;"></el-input>
             <el-button @click="loadJobs"><el-icon><Refresh /></el-icon> 刷新</el-button>
+            <el-button type="primary" @click="openCreateDialog"><el-icon><Plus /></el-icon> 手动录入岗位</el-button>
           </div>
 
           <el-table :data="jobs" v-loading="loading" border size="small">
@@ -268,7 +317,6 @@ const JobPage = {
             <el-table-column label="薪资" prop="salary_text" width="100"></el-table-column>
             <el-table-column label="年限" prop="work_years" width="80"></el-table-column>
             <el-table-column label="学历" prop="education" width="80"></el-table-column>
-            <el-table-column label="平台" prop="platform" width="80"></el-table-column>
             <el-table-column label="操作" width="180" fixed="right">
               <template #default="{ row }">
                 <el-button size="small" @click="viewJob(row)">详情</el-button>
@@ -298,11 +346,9 @@ const JobPage = {
             <el-descriptions-item label="工作年限">{{ currentJob.work_years }}</el-descriptions-item>
             <el-descriptions-item label="学历">{{ currentJob.education }}</el-descriptions-item>
             <el-descriptions-item label="工作类型">{{ currentJob.job_type }}</el-descriptions-item>
-            <el-descriptions-item label="平台">{{ currentJob.platform }}</el-descriptions-item>
             <el-descriptions-item label="公司规模">{{ currentJob.company_size }}</el-descriptions-item>
             <el-descriptions-item label="公司行业">{{ currentJob.company_industry }}</el-descriptions-item>
             <el-descriptions-item label="HR">{{ currentJob.hr_name }}</el-descriptions-item>
-            <el-descriptions-item label="发布时间">{{ currentJob.publish_time }}</el-descriptions-item>
             <el-descriptions-item label="双休" :span="1">{{ currentJob.is_weekend_off ? '是' : '否' }}</el-descriptions-item>
             <el-descriptions-item label="包住宿">{{ currentJob.has_accommodation ? '是' : '否' }}</el-descriptions-item>
           </el-descriptions>
@@ -314,6 +360,130 @@ const JobPage = {
             </el-button>
           </div>
         </div>
+      </el-dialog>
+
+      <el-dialog v-model="createDialog" title="手动录入岗位" width="680px">
+        <el-form :model="createForm" label-width="100px">
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="岗位名称" required>
+                <el-input v-model="createForm.title" placeholder="例如：Java开发工程师"></el-input>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="公司名称" required>
+                <el-input v-model="createForm.company" placeholder="例如：某某科技有限公司"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="城市">
+                <el-input v-model="createForm.city" placeholder="例如：北京"></el-input>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="区县">
+                <el-input v-model="createForm.district" placeholder="例如：海淀区"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="最低薪资">
+                <el-input-number v-model="createForm.salary_min" :min="0" placeholder="最低月薪" style="width:100%;"></el-input-number>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="最高薪资">
+                <el-input-number v-model="createForm.salary_max" :min="0" placeholder="最高月薪" style="width:100%;"></el-input-number>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="薪资文本">
+                <el-input v-model="createForm.salary_text" placeholder="例如：15K-25K"></el-input>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="工作年限">
+                <el-input v-model="createForm.work_years" placeholder="例如：1-3年"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="学历">
+                <el-select v-model="createForm.education" placeholder="请选择" style="width:100%;">
+                  <el-option label="大专" value="大专"></el-option>
+                  <el-option label="本科" value="本科"></el-option>
+                  <el-option label="硕士" value="硕士"></el-option>
+                  <el-option label="博士" value="博士"></el-option>
+                  <el-option label="不限" value="不限"></el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="工作类型">
+                <el-select v-model="createForm.job_type" placeholder="请选择" style="width:100%;">
+                  <el-option label="全职" value="全职"></el-option>
+                  <el-option label="兼职" value="兼职"></el-option>
+                  <el-option label="实习" value="实习"></el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="公司规模">
+                <el-input v-model="createForm.company_size" placeholder="例如：1000-5000人"></el-input>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="公司行业">
+                <el-input v-model="createForm.company_industry" placeholder="例如：互联网"></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="HR姓名">
+                <el-input v-model="createForm.hr_name" placeholder="例如：张经理"></el-input>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="岗位原链接" required>
+                <el-input v-model="createForm.job_url" placeholder="https://..."></el-input>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="双休">
+                <el-select v-model="createForm.is_weekend_off" placeholder="请选择" clearable style="width:100%;">
+                  <el-option label="是" :value="true"></el-option>
+                  <el-option label="否" :value="false"></el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="包住宿">
+                <el-select v-model="createForm.has_accommodation" placeholder="请选择" clearable style="width:100%;">
+                  <el-option label="是" :value="true"></el-option>
+                  <el-option label="否" :value="false"></el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-form-item label="岗位JD">
+            <el-input v-model="createForm.jd_text" type="textarea" :rows="4" placeholder="岗位职责与要求..."></el-input>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="createDialog = false">取消</el-button>
+          <el-button type="primary" @click="submitCreateJob" :loading="createLoading">确认录入</el-button>
+        </template>
       </el-dialog>
     </div>
   `

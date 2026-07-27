@@ -41,27 +41,10 @@ deepseek:
   # 失败重试次数
   max_retries: 3
 
-# 招聘平台 API 配置
-# 说明：各平台开放接口需自行申请，无开放 API 的平台走 Mock 模式
+# 招聘平台配置（已移除需 API 的平台适配器）
+# 当前支持：Mock 演示数据 + 手动录入真实岗位
+# 国内招聘平台（BOSS直聘、智联、前程无忧等）均未开放个人开发者岗位查询 API
 job_platforms:
-  boss:
-    enabled: false
-    base_url: ""
-    app_key: ""
-    app_secret: ""
-  zhilian:
-    enabled: false
-    base_url: ""
-    api_key: ""
-  51job:
-    enabled: false
-    base_url: ""
-    api_key: ""
-  shixiseng:
-    enabled: false
-    base_url: ""
-    api_key: ""
-  # 当所有平台未启用时，系统使用本地 Mock 数据演示完整流程
   mock_mode: true
 
 # 岗位刷新配置

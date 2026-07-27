@@ -8,7 +8,7 @@ from app.models.resume import (
 )
 from app.models.template import JobTemplate
 from app.models.job import Job, JobMatchRecord, Blacklist, JobRefreshLog
-from app.models.application import ApplicationRecord
+from app.models.interview import InterviewQuestion
 
 __all__ = [
     "User",
@@ -16,5 +16,5 @@ __all__ = [
     "ResumeProject", "ResumeSkill", "ResumeOptimizationLog",
     "JobTemplate",
     "Job", "JobMatchRecord", "Blacklist", "JobRefreshLog",
-    "ApplicationRecord",
+    "InterviewQuestion",
 ]

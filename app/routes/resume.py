@@ -131,12 +131,12 @@ def delete_resume(resume_id: int):
     except ValueError as e:
         return error_response(str(e), 404)
 
-    # 先删除/解除其他表对该简历的外键引用，避免完整性冲突
-    from app.models.application import ApplicationRecord
+    # 先解除匹配记录对该简历的外键引用，避免完整性冲突
     from app.models.job import JobMatchRecord
+    from app.models.interview import InterviewQuestion
 
-    ApplicationRecord.query.filter_by(resume_id=resume_id, user_id=g.current_user_id).update({"resume_id": None})
     JobMatchRecord.query.filter_by(resume_id=resume_id, user_id=g.current_user_id).update({"resume_id": None})
+    InterviewQuestion.query.filter_by(resume_id=resume_id, user_id=g.current_user_id).delete(synchronize_session=False)
     ResumeOptimizationLog.query.filter_by(resume_id=resume_id).delete(synchronize_session=False)
 
     # 删除关联文件

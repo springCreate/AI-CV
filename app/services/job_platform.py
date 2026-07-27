@@ -1,19 +1,16 @@
 """
-招聘平台 API 适配层
+招聘平台数据层
 
 设计原则：
-1. 统一抽象 BasePlatformAdapter，各平台实现各自的 fetch_jobs 方法
-2. 平台未配置 API 时走 Mock 模式，返回演示数据，保证完整流程可演示
-3. 严格遵守 PRD：仅查询公开岗位，无投递能力，无爬虫，无模拟登录
-4. 所有平台返回统一的 JobRawItem 结构
+1. 国内招聘平台（BOSS直聘、智联、前程无忧等）均未开放个人开发者岗位查询 API
+2. 本模块保留 Mock 数据适配器用于演示，同时支持手动录入真实岗位
+3. 严格遵守合规要求：无爬虫、无模拟登录、无自动投递
+4. 所有来源返回统一的 JobRawItem 结构
 """
 import logging
 import random
 import datetime
 from typing import List, Dict, Any
-from abc import ABC, abstractmethod
-
-import requests
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +19,7 @@ class JobRawItem:
     """统一的岗位原始数据结构"""
 
     def __init__(self, data: Dict[str, Any]):
-        self.platform = data.get("platform", "unknown")
+        self.platform = data.get("platform", "manual")
         self.platform_job_id = data.get("platform_job_id", "")
         self.title = data.get("title", "")
         self.company = data.get("company", "")
@@ -68,83 +65,9 @@ class JobRawItem:
         }
 
 
-class BasePlatformAdapter(ABC):
-    """招聘平台适配器基类"""
-
-    platform_name = "base"
-
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.enabled = config.get("enabled", False)
-
-    @abstractmethod
-    def fetch_jobs(self, keyword: str, city: str = "", page: int = 1,
-                   page_size: int = 20) -> List[JobRawItem]:
-        """拉取岗位列表"""
-        pass
-
-    def is_available(self) -> bool:
-        return self.enabled
-
-
-class BossAdapter(BasePlatformAdapter):
-    """BOSS直聘适配器（需平台开放 API，目前多为 Mock 演示）"""
-    platform_name = "boss"
-
-    def fetch_jobs(self, keyword: str, city: str = "", page: int = 1,
-                   page_size: int = 20) -> List[JobRawItem]:
-        if not self.is_available():
-            return []
-        # 真实接入示例（占位）：
-        # url = f"{self.config['base_url']}/jobs/search"
-        # params = {"query": keyword, "city": city, "page": page, "size": page_size}
-        # headers = {"Authorization": f"Bearer {self.config['app_key']}"}
-        # resp = requests.get(url, params=params, headers=headers, timeout=15)
-        # return self._parse_response(resp.json())
-        logger.warning("BOSS直聘未配置真实 API，跳过")
-        return []
-
-
-class ZhilianAdapter(BasePlatformAdapter):
-    """智联招聘适配器"""
-    platform_name = "zhilian"
-
-    def fetch_jobs(self, keyword: str, city: str = "", page: int = 1,
-                   page_size: int = 20) -> List[JobRawItem]:
-        if not self.is_available():
-            return []
-        logger.warning("智联招聘未配置真实 API，跳过")
-        return []
-
-
-class Job51Adapter(BasePlatformAdapter):
-    """前程无忧适配器"""
-    platform_name = "51job"
-
-    def fetch_jobs(self, keyword: str, city: str = "", page: int = 1,
-                   page_size: int = 20) -> List[JobRawItem]:
-        if not self.is_available():
-            return []
-        logger.warning("前程无忧未配置真实 API，跳过")
-        return []
-
-
-class ShixisengAdapter(BasePlatformAdapter):
-    """实习僧适配器"""
-    platform_name = "shixiseng"
-
-    def fetch_jobs(self, keyword: str, city: str = "", page: int = 1,
-                   page_size: int = 20) -> List[JobRawItem]:
-        if not self.is_available():
-            return []
-        logger.warning("实习僧未配置真实 API，跳过")
-        return []
-
-
-class MockAdapter(BasePlatformAdapter):
+class MockAdapter:
     """
-    Mock 数据适配器：当所有平台 API 未启用时，生成演示数据
-    保证完整流程（匹配、打分、投递辅助）可演示
+    Mock 数据适配器：生成演示数据，保证完整流程可演示
     """
     platform_name = "mock"
 
@@ -168,9 +91,6 @@ class MockAdapter(BasePlatformAdapter):
     ]
 
     DEMO_CITIES = ["北京", "上海", "深圳", "杭州", "广州", "成都", "南京", "武汉", "天津", "西安"]
-
-    def is_available(self) -> bool:
-        return True  # Mock 始终可用
 
     def fetch_jobs(self, keyword: str, city: str = "", page: int = 1,
                    page_size: int = 20) -> List[JobRawItem]:
@@ -231,41 +151,18 @@ class MockAdapter(BasePlatformAdapter):
 
 
 class PlatformManager:
-    """平台适配器管理器"""
+    """岗位数据源管理器"""
 
-    def __init__(self, platforms_config: Dict[str, Any]):
-        self.config = platforms_config
-        self.adapters: Dict[str, BasePlatformAdapter] = {
-            "boss": BossAdapter(platforms_config.get("boss", {})),
-            "zhilian": ZhilianAdapter(platforms_config.get("zhilian", {})),
-            "51job": Job51Adapter(platforms_config.get("51job", {})),
-            "shixiseng": ShixisengAdapter(platforms_config.get("shixiseng", {})),
-        }
-        self.mock_adapter = MockAdapter({})
-        self.mock_mode = platforms_config.get("mock_mode", True)
-
-    def get_active_adapters(self) -> List[BasePlatformAdapter]:
-        """获取所有启用的平台适配器"""
-        active = [a for a in self.adapters.values() if a.is_available()]
-        if not active and self.mock_mode:
-            return [self.mock_adapter]
-        return active
+    def __init__(self):
+        self.mock_adapter = MockAdapter()
 
     def fetch_all_jobs(self, keyword: str, city: str = "", page: int = 1,
                        page_size: int = 20) -> List[JobRawItem]:
-        """从所有启用平台拉取岗位"""
-        all_items = []
-        for adapter in self.get_active_adapters():
-            try:
-                items = adapter.fetch_jobs(keyword, city, page, page_size)
-                all_items.extend(items)
-                logger.info("平台 %s 返回 %d 个岗位", adapter.platform_name, len(items))
-            except Exception as e:
-                logger.exception("平台 %s 拉取失败: %s", adapter.platform_name, e)
-        return all_items
-
-    def is_mock_mode(self) -> bool:
-        """是否运行在 Mock 模式"""
-        if not self.mock_mode:
-            return False
-        return not any(a.is_available() for a in self.adapters.values())
+        """拉取岗位（当前仅支持 Mock 演示数据）"""
+        try:
+            items = self.mock_adapter.fetch_jobs(keyword, city, page, page_size)
+            logger.info("Mock 模式返回 %d 个岗位", len(items))
+            return items
+        except Exception as e:
+            logger.exception("Mock 拉取失败: %s", e)
+            return []

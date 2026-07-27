@@ -20,7 +20,6 @@ def health():
 def get_config_status():
     """获取系统配置状态（脱敏）"""
     cfg = current_app.config["DEEPSEEK_CFG"]
-    platforms = current_app.config["JOB_PLATFORMS_CFG"]
 
     return success_response(data={
         "deepseek": {
@@ -29,11 +28,6 @@ def get_config_status():
             "base_url": cfg.get("base_url"),
             "max_context_tokens": cfg.get("max_context_tokens"),
         },
-        "platforms": {
-            name: {"enabled": p.get("enabled", False)}
-            for name, p in platforms.items() if name != "mock_mode"
-        },
-        "mock_mode": platforms.get("mock_mode", True),
     })
 
 

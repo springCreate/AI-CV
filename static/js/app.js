@@ -52,7 +52,7 @@ const App = {
       'resume': 'ResumePage',
       'template': 'TemplatePage',
       'job': 'JobPage',
-      'application': 'ApplicationPage',
+      'interview': 'InterviewPage',
       'blacklist': 'BlacklistPage',
       'settings': 'SettingsPage',
     };
@@ -184,7 +184,7 @@ app.component('DashboardPage', DashboardPage);
 app.component('ResumePage', ResumePage);
 app.component('TemplatePage', TemplatePage);
 app.component('JobPage', JobPage);
-app.component('ApplicationPage', ApplicationPage);
+app.component('InterviewPage', InterviewPage);
 app.component('BlacklistPage', BlacklistPage);
 app.component('SettingsPage', SettingsPage);
 

@@ -3,25 +3,25 @@
  */
 const DashboardPage = {
   setup() {
-    const stats = ref({ total: 0, applied: 0, interviewing: 0, offered: 0, rejected: 0, not_applied: 0, trend_7d: [] });
     const resumeCount = ref(0);
     const templateCount = ref(0);
     const jobCount = ref(0);
+    const interviewCount = ref(0);
     const loading = ref(false);
 
     async function loadData() {
       loading.value = true;
       try {
-        const [s, r, t, j] = await Promise.all([
-          API.application.stats(),
+        const [r, t, j, iq] = await Promise.all([
           API.resume.list(),
           API.template.list(),
           API.job.list({ page: 1, per_page: 1 }),
+          API.interview.list({ page: 1, per_page: 1 }),
         ]);
-        stats.value = s;
         resumeCount.value = r.length;
         templateCount.value = t.length;
         jobCount.value = j.total;
+        interviewCount.value = iq.total;
       } catch (e) {
         ElMessage.error(e.message);
       } finally {
@@ -31,7 +31,7 @@ const DashboardPage = {
 
     onMounted(loadData);
 
-    return { stats, resumeCount, templateCount, jobCount, loading, loadData };
+    return { resumeCount, templateCount, jobCount, interviewCount, loading, loadData };
   },
   template: `
     <div v-loading="loading">
@@ -55,39 +55,43 @@ const DashboardPage = {
         <el-col :span="6">
           <div class="stat-card">
             <div class="stat-value">{{ jobCount }}</div>
-            <div class="stat-label">缓存岗位数</div>
+            <div class="stat-label">岗位数量</div>
           </div>
         </el-col>
         <el-col :span="6">
           <div class="stat-card">
-            <div class="stat-value">{{ stats.applied }}</div>
-            <div class="stat-label">已投递岗位</div>
+            <div class="stat-value">{{ interviewCount }}</div>
+            <div class="stat-label">面试题数量</div>
           </div>
         </el-col>
       </el-row>
 
       <el-card class="section-card">
-        <template #header><strong>投递状态分布</strong></template>
+        <template #header><strong>快速入口</strong></template>
         <el-row :gutter="16">
-          <el-col :span="4"><div class="stat-card"><div class="stat-value" style="color:#718096;">{{ stats.not_applied }}</div><div class="stat-label">未投递</div></div></el-col>
-          <el-col :span="4"><div class="stat-card"><div class="stat-value" style="color:#3182ce;">{{ stats.applied }}</div><div class="stat-label">已投递</div></div></el-col>
-          <el-col :span="4"><div class="stat-card"><div class="stat-value" style="color:#d69e2e;">{{ stats.interviewing }}</div><div class="stat-label">面试中</div></div></el-col>
-          <el-col :span="4"><div class="stat-card"><div class="stat-value" style="color:#38a169;">{{ stats.offered }}</div><div class="stat-label">Offer</div></div></el-col>
-          <el-col :span="4"><div class="stat-card"><div class="stat-value" style="color:#e53e3e;">{{ stats.rejected }}</div><div class="stat-label">已拒绝</div></div></el-col>
-          <el-col :span="4"><div class="stat-card"><div class="stat-value" style="color:#805ad5;">{{ stats.total }}</div><div class="stat-label">总记录</div></div></el-col>
+          <el-col :span="6" style="text-align:center;">
+            <el-button type="primary" size="large" @click="$root.handleMenuSelect('resume')">上传简历</el-button>
+          </el-col>
+          <el-col :span="6" style="text-align:center;">
+            <el-button type="success" size="large" @click="$root.handleMenuSelect('job')">岗位匹配</el-button>
+          </el-col>
+          <el-col :span="6" style="text-align:center;">
+            <el-button type="warning" size="large" @click="$root.handleMenuSelect('interview')">生成面试题</el-button>
+          </el-col>
+          <el-col :span="6" style="text-align:center;">
+            <el-button size="large" @click="$root.handleMenuSelect('settings')">系统设置</el-button>
+          </el-col>
         </el-row>
       </el-card>
 
       <el-card>
-        <template #header><strong>近 7 日投递趋势</strong></template>
-        <div v-if="stats.trend_7d && stats.trend_7d.length" style="display:flex;align-items:flex-end;height:200px;gap:12px;padding:0 20px;">
-          <div v-for="item in stats.trend_7d" :key="item.date" style="flex:1;text-align:center;">
-            <div :style="{height: (item.count * 30 + 10) + 'px', background:'linear-gradient(180deg,#4299e1,#3182ce)',borderRadius:'6px 6px 0 0',transition:'all 0.3s'}"></div>
-            <div style="font-size:12px;color:#718096;margin-top:8px;">{{ item.count }}</div>
-            <div style="font-size:11px;color:#a0aec0;margin-top:2px;">{{ item.date.slice(5) }}</div>
-          </div>
-        </div>
-        <div v-else class="empty-state">暂无数据</div>
+        <template #header><strong>使用指南</strong></template>
+        <el-steps direction="vertical" :active="4">
+          <el-step title="上传简历" description="在「我的简历」页面上传 PDF/Word 格式的简历，系统将自动解析简历内容"></el-step>
+          <el-step title="设置求职诉求" description="在「求职诉求」页面创建求职诉求模板，包括期望薪资、城市、工作年限等"></el-step>
+          <el-step title="录入岗位并匹配" description="在「岗位匹配」页面手动录入岗位信息，选择简历和岗位进行智能匹配"></el-step>
+          <el-step title="生成面试题" description="在「面试题库」页面选择简历和岗位，AI 将根据岗位JD和简历生成面试官可能提问的问题清单"></el-step>
+        </el-steps>
       </el-card>
     </div>
   `

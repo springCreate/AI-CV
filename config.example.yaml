@@ -1,5 +1,5 @@
 # ============================================
-# AI 智能简历适配与多平台岗位匹配投递系统 - 配置文件
+# AI 智能简历适配与岗位匹配系统 - 配置文件
 # 复制本文件为 config.yaml 并填入真实配置后使用
 # ============================================
 
@@ -19,7 +19,7 @@ database:
 storage:
   resume_dir: "data/resumes"        # 原始简历文件
   optimized_dir: "data/optimized"   # AI 优化后简历
-  export_dir: "data/exports"        # Excel 导出文件
+  export_dir: "data/exports"        # 导出文件
   max_upload_mb: 20
 
 # DeepSeek AI 配置
@@ -30,38 +30,21 @@ deepseek:
   api_key: "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   # 模型选择：deepseek-chat（通用）/ deepseek-reasoner（推理）
   model: "deepseek-chat"
-  # 模型最大上下文 Token（DeepSeek 上限为 1048576，预留安全边距）
+  # 模型最大上下文 Token
   max_context_tokens: 1048000
   # 单次响应最大 Token
   max_output_tokens: 4096
-  # 温度参数：0.0-2.0，简历优化建议用 0.3-0.7 较稳定
+  # 温度参数：0.0-2.0
   temperature: 0.5
   # 请求超时（秒）
   timeout: 120
   # 失败重试次数
   max_retries: 3
 
-# 招聘平台 API 配置
-# 说明：各平台开放接口需自行申请，无开放 API 的平台走 Mock 模式
+# 招聘平台配置
+# 国内招聘平台（BOSS直聘、智联、前程无忧等）均未开放个人开发者岗位查询 API
+# 当前支持：手动录入真实岗位
 job_platforms:
-  boss:
-    enabled: false
-    base_url: ""
-    app_key: ""
-    app_secret: ""
-  zhilian:
-    enabled: false
-    base_url: ""
-    api_key: ""
-  51job:
-    enabled: false
-    base_url: ""
-    api_key: ""
-  shixiseng:
-    enabled: false
-    base_url: ""
-    api_key: ""
-  # 当所有平台未启用时，系统使用本地 Mock 数据演示完整流程
   mock_mode: true
 
 # 岗位刷新配置

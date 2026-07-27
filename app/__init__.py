@@ -54,14 +54,14 @@ def register_blueprints(app):
     from app.routes.resume import resume_bp
     from app.routes.template import template_bp
     from app.routes.job import job_bp
-    from app.routes.application import application_bp
+    from app.routes.interview import interview_bp
     from app.routes.system import system_bp
 
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(resume_bp, url_prefix="/api/resume")
     app.register_blueprint(template_bp, url_prefix="/api/template")
     app.register_blueprint(job_bp, url_prefix="/api/job")
-    app.register_blueprint(application_bp, url_prefix="/api/application")
+    app.register_blueprint(interview_bp, url_prefix="/api/interview")
     app.register_blueprint(system_bp, url_prefix="/api/system")
 
 
@@ -108,14 +108,20 @@ def create_app():
     # 静态文件入口（前端 SPA）
     @app.route("/")
     def index():
-        return send_from_directory(app.static_folder, "index.html")
+        resp = send_from_directory(app.static_folder, "index.html")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
 
     @app.route("/<path:path>")
     def static_proxy(path):
         full_path = os.path.join(app.static_folder, path)
         if os.path.exists(full_path):
-            return send_from_directory(app.static_folder, path)
-        return send_from_directory(app.static_folder, "index.html")
+            resp = send_from_directory(app.static_folder, path)
+            resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            return resp
+        resp = send_from_directory(app.static_folder, "index.html")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
 
     app.logger.info("应用创建完成")
     return app

@@ -16,7 +16,6 @@ from app.extensions import db
 from app.models.resume import Resume
 from app.models.template import JobTemplate
 from app.models.job import Job, JobMatchRecord, Blacklist, JobRefreshLog
-from app.models.application import ApplicationRecord
 from app.services.job_matcher import JobMatcher
 from app.services.job_platform import PlatformManager
 from app.utils.decorators import login_required
@@ -75,58 +74,103 @@ def delete_job(job_id: int):
     return success_response(message="已删除")
 
 
-# ============ 拉取与匹配 ============
-
-@job_bp.route("/fetch-match", methods=["POST"])
+@job_bp.route("", methods=["POST"])
 @login_required
-def fetch_and_match():
+def create_job():
     """
-    一键拉取岗位并匹配打分
+    手动录入真实岗位
+    请求体：{
+        "title": "岗位名称",
+        "company": "公司名称",
+        "city": "城市",
+        "salary_min": 10000,
+        "salary_max": 20000,
+        "work_years": "1-3年",
+        "education": "本科",
+        "jd_text": "岗位职责...",
+        "job_url": "https://www.zhipin.com/job_detail/...",
+        "company_size": "1000-5000人",
+        "company_industry": "互联网",
+        "job_type": "全职",
+        "is_weekend_off": true,
+        "has_accommodation": false
+    }
+    """
+    data = request.get_json() or {}
+    required_fields = ["title", "company", "job_url"]
+    missing = [f for f in required_fields if not data.get(f)]
+    if missing:
+        return error_response(f"缺少必填字段: {', '.join(missing)}", 400)
+
+    job = Job(
+        user_id=g.current_user_id,
+        platform="manual",
+        platform_job_id=f"manual_{datetime.datetime.utcnow().timestamp()}",
+        title=data.get("title", "").strip(),
+        company=data.get("company", "").strip(),
+        city=data.get("city", "").strip(),
+        district=data.get("district", "").strip(),
+        salary_min=data.get("salary_min"),
+        salary_max=data.get("salary_max"),
+        salary_text=data.get("salary_text", ""),
+        work_years=data.get("work_years", ""),
+        education=data.get("education", ""),
+        job_type=data.get("job_type", "全职"),
+        is_weekend_off=data.get("is_weekend_off"),
+        has_accommodation=data.get("has_accommodation"),
+        jd_text=data.get("jd_text", ""),
+        company_size=data.get("company_size", ""),
+        company_industry=data.get("company_industry", ""),
+        hr_name=data.get("hr_name", ""),
+        job_url=data.get("job_url", "").strip(),
+        last_fetched_at=datetime.datetime.utcnow(),
+    )
+    db.session.add(job)
+    db.session.commit()
+    return success_response(data=job.to_dict(), message="岗位录入成功", code=201)
+
+
+# ============ 智能匹配 ============
+
+@job_bp.route("/match", methods=["POST"])
+@login_required
+def match_single_job():
+    """
+    单岗位智能匹配（选择简历+岗位+模板）
     请求体：
     {
         "resume_id": 1,
-        "template_id": 1,
-        "keyword": "软件测试",   # 可选，默认用模板的 position
-        "city": "北京"          # 可选，默认用模板的第一个城市
+        "job_id": 1,
+        "template_id": 1
     }
     """
     data = request.get_json() or {}
     resume_id = data.get("resume_id")
+    job_id = data.get("job_id")
     template_id = data.get("template_id")
-    keyword = data.get("keyword", "")
-    city = data.get("city", "")
 
-    if not resume_id or not template_id:
-        return error_response("请提供 resume_id 和 template_id", 400)
+    if not resume_id or not job_id or not template_id:
+        return error_response("请提供 resume_id、job_id 和 template_id", 400)
 
     resume = Resume.query.filter_by(id=resume_id, user_id=g.current_user_id).first()
     if not resume:
         return error_response("简历不存在", 404)
+
+    job = Job.query.filter_by(id=job_id, user_id=g.current_user_id).first()
+    if not job:
+        return error_response("岗位不存在", 404)
 
     template = JobTemplate.query.filter_by(id=template_id, user_id=g.current_user_id).first()
     if not template:
         return error_response("求职诉求模板不存在", 404)
 
     try:
-        result = JobMatcher.fetch_and_match(
-            g.current_user_id, resume, template, keyword, city
-        )
+        result = JobMatcher.match_single_job(g.current_user_id, resume, job, template)
     except Exception as e:
-        current_app.logger.exception("岗位拉取匹配失败")
-        return error_response(f"拉取匹配失败: {e}", 500)
+        current_app.logger.exception("单岗位匹配失败")
+        return error_response(f"匹配失败: {e}", 500)
 
-    # 记录刷新日志
-    log = JobRefreshLog(
-        user_id=g.current_user_id,
-        new_job_count=result["new_saved"],
-        high_match_count=result["high_match_count"],
-        status="success",
-        finished_at=datetime.datetime.utcnow(),
-    )
-    db.session.add(log)
-    db.session.commit()
-
-    return success_response(data=result, message=f"拉取 {result['total_fetched']} 个岗位，新增 {result['new_saved']}，高匹配 {result['high_match_count']}")
+    return success_response(data=result, message=f"匹配完成，得分 {result['match_score']}")
 
 
 @job_bp.route("/match-records", methods=["GET"])
@@ -234,21 +278,13 @@ def remove_blacklist(blacklist_id: int):
 @job_bp.route("/platforms/status", methods=["GET"])
 @login_required
 def platforms_status():
-    """获取各平台启用状态"""
-    cfg = current_app.config["JOB_PLATFORMS_CFG"]
-    manager = PlatformManager(cfg)
-    data = []
-    for name, adapter in manager.adapters.items():
-        data.append({
-            "platform": name,
-            "enabled": adapter.is_available(),
-        })
-    data.append({
-        "platform": "mock",
-        "enabled": manager.is_mock_mode(),
-    })
+    """获取数据源状态（当前仅支持 Mock 演示数据 + 手动录入）"""
+    cfg = current_app.config.get("JOB_PLATFORMS_CFG", {})
     return success_response(data={
-        "platforms": data,
-        "mock_mode": manager.is_mock_mode(),
-        "active_count": sum(1 for a in manager.adapters.values() if a.is_available()),
+        "platforms": [
+            {"platform": "mock", "enabled": cfg.get("mock_mode", True)},
+            {"platform": "manual", "enabled": True},
+        ],
+        "mock_mode": cfg.get("mock_mode", True),
+        "active_count": 0,
     })

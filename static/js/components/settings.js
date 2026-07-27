@@ -6,14 +6,12 @@ const SettingsPage = {
     const config = ref(null);
     const userForm = ref({});
     const pwdForm = ref({ old_password: '', new_password: '', confirm: '' });
-    const platforms = ref([]);
     const loading = ref(false);
     const testing = ref(false);
 
     async function loadConfig() {
       try {
         config.value = await API.system.config();
-        platforms.value = config.value.platforms;
       } catch (e) {
         ElMessage.error(e.message);
       }
@@ -83,9 +81,9 @@ const SettingsPage = {
     });
 
     return {
-      config, userForm, pwdForm, platforms, loading, testing,
-      loadConfig, loadUser, saveUser, resetPassword, testAi,
-    };
+        config, userForm, pwdForm, loading, testing,
+        loadConfig, loadUser, saveUser, resetPassword, testAi,
+      };
   },
   template: `
     <div>
@@ -111,25 +109,6 @@ const SettingsPage = {
             </el-alert>
           </div>
         </div>
-      </el-card>
-
-      <el-card class="section-card">
-        <template #header><strong>招聘平台状态</strong></template>
-        <el-table :data="platforms" size="small" border>
-          <el-table-column label="平台" prop="platform">
-            <template #default="{ row }">
-              {{ {boss:'BOSS直聘', zhilian:'智联招聘', '51job':'前程无忧', shixiseng:'实习僧', mock:'演示模式'}[row.platform] || row.platform }}
-            </template>
-          </el-table-column>
-          <el-table-column label="状态" prop="enabled">
-            <template #default="{ row }">
-              <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? '已启用' : '未启用' }}</el-tag>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-alert v-if="config && config.mock_mode" type="warning" :closable="false" style="margin-top:12px;">
-          当前为演示模式：使用本地 Mock 数据演示完整流程。请在 config.yaml 中配置真实平台 API 以接入实际数据。
-        </el-alert>
       </el-card>
 
       <el-card class="section-card">

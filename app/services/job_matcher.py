@@ -287,34 +287,98 @@ JSON 输出结构：
         return records
 
     @staticmethod
-    def fetch_and_match(user_id: int, resume: Resume, template: JobTemplate,
-                        keyword: str = "", city: str = "") -> Dict:
+    def match_single_job(user_id: int, resume: Resume, job: Job, template: JobTemplate) -> Dict:
         """
-        拉取平台岗位 + 落库 + 匹配打分 一站式流程
+        单岗位智能匹配（选择简历+岗位+模板）
+        返回匹配度评分、摘要、缺失技能和技能提升建议
         """
-        from flask import current_app
-        platforms_cfg = current_app.config["JOB_PLATFORMS_CFG"]
-        manager = PlatformManager(platforms_cfg)
+        passed, hard_reason = JobMatcher.hard_filter(job, template)
 
-        keyword = keyword or template.position or ""
-        city = city or (template.cities.split(",")[0] if template.cities else "")
+        match_score = 0
+        match_summary = ""
+        missing_skills = []
+        skill_suggestions = []
 
-        # 1. 拉取
-        raw_items = manager.fetch_all_jobs(keyword, city)
-        # 2. 落库
-        new_count, all_jobs = JobMatcher.save_jobs_to_db(user_id, raw_items)
-        # 3. 匹配
-        records = JobMatcher.match_jobs(user_id, resume, template, all_jobs)
+        if passed:
+            try:
+                score_result = JobMatcher.soft_score(job, resume, template)
+                match_score = score_result["score"]
+                match_summary = score_result["summary"]
+                missing_skills = score_result.get("missing_skills", [])
 
-        # 高匹配度统计
-        high_match_threshold = current_app.config.get("JOB_REFRESH_CFG", {}).get("high_match_threshold", 80)
-        high_match_count = sum(1 for r in records if r.hard_filter_passed and r.match_score >= high_match_threshold)
+                if missing_skills:
+                    suggestions = JobMatcher.generate_skill_suggestions(job, resume, missing_skills)
+                    skill_suggestions = suggestions
+            except Exception as e:
+                logger.exception("岗位 %s 打分失败", job.id)
+                match_summary = f"打分失败: {e}"
+        else:
+            match_summary = f"硬性条件未通过: {hard_reason}"
+
+        record = JobMatchRecord(
+            user_id=user_id,
+            job_id=job.id,
+            resume_id=resume.id,
+            template_id=template.id,
+            hard_filter_passed=passed,
+            hard_filter_reason=hard_reason if not passed else None,
+            match_score=match_score,
+            match_summary=match_summary,
+            missing_skills=",".join(missing_skills),
+        )
+        db.session.add(record)
+        db.session.commit()
 
         return {
-            "total_fetched": len(raw_items),
-            "new_saved": new_count,
-            "total_matched": len(records),
-            "high_match_count": high_match_count,
-            "is_mock_mode": manager.is_mock_mode(),
-            "records": [r.to_dict() for r in records],
+            "match_score": match_score,
+            "match_summary": match_summary,
+            "hard_filter_passed": passed,
+            "hard_filter_reason": hard_reason if not passed else None,
+            "missing_skills": missing_skills,
+            "skill_suggestions": skill_suggestions,
+            "job": job.to_dict(),
         }
+
+    @staticmethod
+    def generate_skill_suggestions(job: Job, resume: Resume, missing_skills: List[str]) -> List[str]:
+        """
+        根据岗位JD和缺失技能生成技能提升建议
+        """
+        if not missing_skills:
+            return []
+
+        resume_data = resume.to_dict()
+        skills = [s.get("name", "") for s in resume_data.get("skills", [])]
+
+        system_prompt = """你是资深技术职业规划师。请根据岗位要求和候选人现有技能，给出针对性的技能提升建议。
+
+输出格式：返回一个建议列表（最多5条），每条建议要具体、可执行，包含学习方向和实践方法。
+
+示例输出：
+["建议学习 Redis 缓存设计，可通过搭建个人博客项目实践", "建议深入学习 Kubernetes 容器编排，推荐 CKAD 认证"]"""
+
+        user_content = f"""# 岗位信息
+岗位名称：{job.title}
+公司：{job.company}
+
+## 岗位要求（JD）
+{job.jd_text[:500] if job.jd_text else '暂无详细JD'}
+
+# 候选人现有技能
+{', '.join(skills) if skills else '未填写'}
+
+# 需要提升的技能
+{', '.join(missing_skills)}
+
+请给出具体的技能提升建议。"""
+
+        try:
+            result = DeepSeekService.chat_json(system_prompt, user_content, temperature=0.3)
+            if isinstance(result, list):
+                return result[:5]
+            elif isinstance(result, dict) and "suggestions" in result:
+                return result["suggestions"][:5]
+            return []
+        except Exception as e:
+            logger.exception("技能建议生成失败")
+            return [f"建议学习 {skill}，可通过项目实践或在线课程提升" for skill in missing_skills[:5]]
